@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>TradeBot — لوحة التحكم</title>
+  <title>TradeBot — Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.0.0/dist/chartjs-chart-financial.min.js"></script>
   <style>
@@ -15,12 +15,12 @@
     th,td{padding:6px;border-bottom:1px solid rgba(255,255,255,0.05); text-align:center}
     .green{color:#7cf3a6} .red{color:#ff9b9b}
     .controls{display:flex; gap:8px; margin:8px 0}
-    select, button{padding:6px 8px; border-radius:6px; background:#071025; color:#e6eef8; border:1px solid rgba(255,255,255,0.03)}
+    select, button, input{padding:6px 8px; border-radius:6px; background:#071025; color:#e6eef8; border:1px solid rgba(255,255,255,0.03)}
   </style>
 </head>
 <body>
   <div class="top">
-    <h2>TradeBot — لوحة التحكم (محاكاة)</h2>
+    <h2>TradeBot — Dashboard (محاكاة)</h2>
     <div style="margin-left:auto">
       <span id="balance" class="card">الرصيد: $--</span>
     </div>
@@ -28,20 +28,26 @@
 
   <div class="card" style="margin-top:10px">
     <div class="controls">
-      <label>الرمز:
-        <select id="symbolSelect"></select>
+      <label>الزوج:
+        <select id="symbolSelect">
+          <option>ETHUSDT</option>
+          <option>BTCUSDT</option>
+          <option>BNBUSDT</option>
+          <option>SOLUSDT</option>
+          <option>ADAUSDT</option>
+        </select>
       </label>
-      <label>شموع:
-        <select id="limitSelect"><option>200</option><option>100</option><option>50</option></select>
+      <label>المدة:
+        <select id="monthsSelect"><option value="1">شهر</option><option value="6">6 أشهر</option></select>
       </label>
-      <button id="refreshBtn">تحديث</button>
-      <a id="download" style="margin-left:auto;color:#8cd4ff">تحميل سجل الصفقات</a>
+      <button id="runBtn">تشغيل المحاكاة</button>
+      <a id="download" style="margin-left:auto;color:#8cd4ff" href="/download_trades">تحميل سجل الصفقات</a>
     </div>
     <canvas id="chart"></canvas>
   </div>
 
   <div class="card" id="statsCard" style="margin-top:12px">
-    <strong>الإحصائيات</strong>
+    <strong>نتائج المحاكاة</strong>
     <div id="stats" style="margin-top:6px">جارِ التحميل...</div>
 
     <table id="tradesTable">
