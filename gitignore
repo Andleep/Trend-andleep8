@@ -1,5 +1,0 @@
-__pycache__/
-*.pyc
-.env
-bot_debug.log
-trades.csv
