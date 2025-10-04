@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: lorentzian-trading-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: BINANCE_API_KEY
+        value: your_testnet_api_key_here
+      - key: BINANCE_API_SECRET
+        value: your_testnet_api_secret_here
+      - key: TESTNET
+        value: "true"
+      - key: INITIAL_BALANCE
+        value: "1000"
+      - key: RISK_PER_TRADE
+        value: "0.02"
