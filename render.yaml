@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: trading-bot-final
-    env: python
-    plan: free
-    buildCommand: chmod +x setup.sh && ./setup.sh
-    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
