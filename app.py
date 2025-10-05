@@ -1,117 +1,103 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime
 import random
+from datetime import datetime
 
 # إعداد الصفحة
 st.set_page_config(
-    page_title="بوت التداول الذكي",
-    page_icon="🚀",
+    page_title="بوت التداول المستقر",
+    page_icon="💰",
     layout="wide"
 )
 
-st.title("🚀 بوت التداول الذكي - الإصدار النهائي")
-st.markdown("نظام تداول بربح تراكمي فوري بعد كل صفقة")
+st.title("💰 بوت التداول الذكي - الإصدار المستقر")
+st.write("نظام تداول بربح تراكمي - إصدار مضمون العمل")
 
 # تهيئة الحالة
 if 'balance' not in st.session_state:
     st.session_state.balance = 1000.0
     st.session_state.trades = []
-    st.session_state.bot_running = False
+    st.session_state.equity_data = [1000.0]
+    st.session_state.dates = [datetime.now()]
 
-# الشريط الجانبي
-st.sidebar.header("الإعدادات")
+# واجهة التحكم
+st.sidebar.header("🎛️ لوحة التحكم")
 
-# أزرار التحكم
+if st.sidebar.button("🔄 صفقة جديدة", type="primary"):
+    # محاكاة صفقة
+    profit = random.uniform(-25, 40)
+    st.session_state.balance = round(st.session_state.balance + profit, 2)
+    
+    trade = {
+        'time': datetime.now(),
+        'profit': profit,
+        'balance': st.session_state.balance
+    }
+    st.session_state.trades.append(trade)
+    st.session_state.equity_data.append(st.session_state.balance)
+    st.session_state.dates.append(datetime.now())
+    
+    if profit > 0:
+        st.sidebar.success(f"✅ ربح: +${profit:.2f}")
+    else:
+        st.sidebar.error(f"❌ خسارة: {profit:.2f}")
+
+if st.sidebar.button("🔄 إعادة التعيين"):
+    st.session_state.balance = 1000.0
+    st.session_state.trades = []
+    st.session_state.equity_data = [1000.0]
+    st.session_state.dates = [datetime.now()]
+    st.sidebar.info("تم إعادة التعيين")
+
+# عرض البيانات
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("▶️ بدء البوت", type="primary"):
-        st.session_state.bot_running = True
-        st.success("البوت يعمل الآن!")
-
-with col2:
-    if st.button("⏸️ إيقاف"):
-        st.session_state.bot_running = False
-        st.warning("البوت متوقف")
-
-with col3:
-    if st.button("🔄 صفقة تجريبية"):
-        # محاكاة صفقة واقعية
-        profit = random.uniform(-30, 50)
-        st.session_state.balance += profit
-        
-        trade = {
-            'time': datetime.now(),
-            'profit': profit,
-            'balance': st.session_state.balance,
-            'type': 'BUY' if profit > 0 else 'SELL'
-        }
-        st.session_state.trades.append(trade)
-        
-        if profit > 0:
-            st.success(f"✅ صفقة رابحة! +${profit:.2f}")
-        else:
-            st.error(f"❌ صفقة خاسرة! {profit:.2f}")
-
-# عرض المعلومات
-st.header("📊 لوحة التحكم")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("الرصيد الحالي", f"${st.session_state.balance:.2f}")
-
-with col2:
-    total_profit = st.session_state.balance - 1000
-    st.metric("الربح الإجمالي", f"${total_profit:.2f}")
-
-with col3:
-    st.metric("عدد الصفقات", len(st.session_state.trades))
-
-with col4:
-    status = "🟢 يعمل" if st.session_state.bot_running else "🔴 متوقف"
-    st.metric("حالة البوت", status)
-
-# الرسم البياني
-if st.session_state.trades:
-    st.subheader("📈 تطور رأس المال")
-    
-    dates = [t['time'] for t in st.session_state.trades]
-    balances = [t['balance'] for t in st.session_state.trades]
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=dates, 
-        y=balances, 
-        mode='lines+markers',
-        name='رأس المال',
-        line=dict(color='green', width=3)
-    ))
-    
-    fig.update_layout(
-        title="نمو رأس المال مع نظام الربح التراكمي",
-        xaxis_title="الوقت",
-        yaxis_title="رأس المال ($)",
-        height=400
+    st.metric(
+        "💰 الرصيد الحالي", 
+        f"${st.session_state.balance:.2f}",
+        f"{st.session_state.balance - 1000:.2f}"
     )
+
+with col2:
+    total_trades = len(st.session_state.trades)
+    winning_trades = len([t for t in st.session_state.trades if t['profit'] > 0])
+    win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+    st.metric("📈 معدل الفوز", f"{win_rate:.1f}%")
+
+with col3:
+    st.metric("🔢 الصفقات", total_trades)
+
+# الرسم البياني البسيط
+if len(st.session_state.equity_data) > 1:
+    st.subheader("📊 منحنى رأس المال")
     
-    st.plotly_chart(fig, use_container_width=True)
+    chart_data = pd.DataFrame({
+        'الرصيد': st.session_state.equity_data,
+        'التاريخ': st.session_state.dates
+    })
+    
+    st.line_chart(chart_data.set_index('التاريخ')['الرصيد'])
 
 # سجل الصفقات
 if st.session_state.trades:
-    st.subheader("📝 آخر الصفقات")
+    st.subheader("📝 سجل الصفقات")
     
-    # عرض آخر 5 صفقات
-    recent_trades = st.session_state.trades[-5:]
-    for trade in reversed(recent_trades):
+    # آخر 10 صفقات
+    recent_trades = st.session_state.trades[-10:]
+    
+    for i, trade in enumerate(reversed(recent_trades)):
         emoji = "🟢" if trade['profit'] > 0 else "🔴"
-        st.write(f"{emoji} {trade['time'].strftime('%H:%M:%S')} - الربح: ${trade['profit']:.2f} - الرصيد: ${trade['balance']:.2f}")
+        st.write(f"{emoji} `{trade['time'].strftime('%H:%M:%S')}` - الربح: `${trade['profit']:+.2f}` - الرصيد: `${trade['balance']:.2f}`")
 
-# نظام التشغيل التلقائي
-if st.session_state.bot_running:
-    st.info("🔄 البوت يعمل تلقائياً... (محاكاة)")
+# معلومات النظام
+st.sidebar.markdown("---")
+st.sidebar.info("""
+**ℹ️ معلومات النظام:**
+- الإصدار: 1.0.0 مستقر
+- الحالة: ✅ يعمل بشكل مثالي
+- الربح التراكمي: ✅ مفعل
+""")
 
 st.markdown("---")
-st.success("✅ البوت جاهز للعمل! استخدم الأزرار أعلاه للتحكم.")
+st.success("🎉 التطبيق يعمل بنجاح! يمكنك البدء في إجراء الصفقات.")
