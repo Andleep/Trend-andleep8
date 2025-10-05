@@ -3,347 +3,479 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
-import numpy as np
 import random
+import numpy as np
 
 # إعداد الصفحة
 st.set_page_config(
-    page_title="بوت التداول الذكي - النسخة التجريبية",
+    page_title="البوت اللورنتزي الذكي - الإصدار النهائي",
     page_icon="🚀",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.title("🚀 بوت التداول الذكي - النسخة التجريبية")
+# العنوان الرئيسي مع تنسيق محسن
+st.title("🚀 البوت اللورنتزي الذكي - نظام الربح التراكمي")
 st.markdown("""
-**هذه نسخة تجريبية تعمل بدون اتصال بـ Binance**
-- 🤖 محاكاة الذكاء الاصطناعي
-- 💰 نظام ربح تراكمي
-- 📊 رسوم بيانية حية
-- ⚡ تشغيل فوري
-""")
+<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; color: white;'>
+<h3 style='color: white; margin: 0;'>✨ نظام تداول ذكي بربح تراكمي فوري</h3>
+<p style='margin: 10px 0 0 0;'>كل ربح يضاف تلقائياً إلى رأس المال للصفقة التالية</p>
+</div>
+""", unsafe_allow_html=True)
 
-# حالة التطبيق
-if 'initialized' not in st.session_state:
-    st.session_state.initialized = True
-    st.session_state.balance = 1000.0
-    st.session_state.initial_balance = 1000.0
-    st.session_state.trades = []
-    st.session_state.bot_running = False
-    st.session_state.demo_prices = {
-        "BTCUSDT": 45000.0,
-        "ETHUSDT": 2500.0,
-        "ADAUSDT": 0.45
-    }
+# تهيئة حالة الجلسة
+def initialize_session_state():
+    if 'initialized' not in st.session_state:
+        st.session_state.initialized = True
+        st.session_state.balance = 1000.0
+        st.session_state.initial_balance = 1000.0
+        st.session_state.trades = []
+        st.session_state.bot_running = False
+        st.session_state.last_update = datetime.now()
+        st.session_state.performance_stats = {
+            'total_trades': 0,
+            'winning_trades': 0,
+            'losing_trades': 0,
+            'total_profit': 0.0,
+            'max_balance': 1000.0,
+            'min_balance': 1000.0
+        }
+        # بيانات محاكاة واقعية
+        st.session_state.market_data = {
+            "BTCUSDT": {"price": 45000.0, "volatility": 2.5},
+            "ETHUSDT": {"price": 2500.0, "volatility": 3.0},
+            "ADAUSDT": {"price": 0.45, "volatility": 4.0},
+            "BNBUSDT": {"price": 320.0, "volatility": 2.8}
+        }
 
-# محاكاة بيانات السوق
-def generate_market_data(symbol):
-    current_price = st.session_state.demo_prices[symbol]
-    # تغيير عشوائي بسيط في السعر
-    change_percent = random.uniform(-0.5, 0.5)
-    new_price = current_price * (1 + change_percent / 100)
-    st.session_state.demo_prices[symbol] = new_price
+initialize_session_state()
+
+# محاكاة بيانات السوق المحسنة
+def simulate_market_movement(symbol):
+    data = st.session_state.market_data[symbol]
+    volatility = data["volatility"]
+    current_price = data["price"]
+    
+    # تغيير واقعي في السعر مع اتجاهات عشوائية
+    change_percent = random.normalvariate(0, volatility) / 100
+    new_price = current_price * (1 + change_percent)
+    
+    # منع الأسعار من أن تكون غير واقعية
+    new_price = max(new_price, current_price * 0.5)  # لا تقل عن 50%
+    new_price = min(new_price, current_price * 1.5)  # لا تزيد عن 150%
+    
+    st.session_state.market_data[symbol]["price"] = round(new_price, 2)
     return new_price
 
-# محاكاة إشارة التداول
-def generate_trading_signal(symbol):
-    signal_types = ['BUY', 'SELL', 'HOLD']
-    weights = [0.4, 0.4, 0.2]  # زيادة احتمالية التداول
-    signal = random.choices(signal_types, weights=weights)[0]
+# خوارزمية تداول ذكية محسنة
+def generate_intelligent_signal(symbol):
+    current_price = st.session_state.market_data[symbol]["price"]
     
-    # جعل الإشارات أكثر واقعية
-    if len(st.session_state.trades) > 0:
-        last_trade = st.session_state.trades[-1]
-        if last_trade['signal'] == 'BUY':
-            signal = random.choices(['SELL', 'HOLD'], weights=[0.7, 0.3])[0]
-        elif last_trade['signal'] == 'SELL':
-            signal = random.choices(['BUY', 'HOLD'], weights=[0.7, 0.3])[0]
+    if len(st.session_state.trades) < 5:
+        # في البداية، تكون الإشارات أكثر تحفظاً
+        signals = ['BUY', 'SELL', 'HOLD']
+        weights = [0.3, 0.3, 0.4]
+        return random.choices(signals, weights=weights)[0]
     
-    return signal
+    # تحليل الأداء السابق
+    recent_trades = st.session_state.trades[-10:]  # آخر 10 صفقات
+    if recent_trades:
+        winning_trades = [t for t in recent_trades if t.get('profit', 0) > 0]
+        win_rate = len(winning_trades) / len(recent_trades)
+        
+        # تعديل الاستراتيجية بناءً على معدل الفوز
+        if win_rate > 0.6:
+            # إذا كان الأداء جيداً، كن أكثر جرأة
+            signals = ['BUY', 'SELL', 'HOLD']
+            weights = [0.4, 0.4, 0.2]
+        elif win_rate < 0.4:
+            # إذا كان الأداء ضعيفاً، كن أكثر حذراً
+            signals = ['BUY', 'SELL', 'HOLD']
+            weights = [0.2, 0.2, 0.6]
+        else:
+            # أداء متوسط
+            signals = ['BUY', 'SELL', 'HOLD']
+            weights = [0.35, 0.35, 0.3]
+    else:
+        signals = ['BUY', 'SELL', 'HOLD']
+        weights = [0.33, 0.33, 0.34]
+    
+    return random.choices(signals, weights=weights)[0]
 
-# تنفيذ صفقة وهمية
-def execute_demo_trade(symbol, signal, current_price):
-    risk_percent = 0.02  # مخاطرة 2%
-    risk_amount = st.session_state.balance * risk_percent
+# نظام إدارة المخاطر المحسن
+def calculate_position_size(symbol, signal):
+    current_price = st.session_state.market_data[symbol]["price"]
+    base_risk = 0.02  # مخاطرة أساسية 2%
     
-    if risk_amount < 10:  # الحد الأدنى
+    # تعديل المخاطرة بناءً على حجم الرصيد
+    if st.session_state.balance > 5000:
+        base_risk = 0.015  # مخاطرة أقل للرصيد الكبير
+    elif st.session_state.balance < 200:
+        base_risk = 0.03   # مخاطرة أعلى للرصيد الصغير
+    
+    risk_amount = st.session_state.balance * base_risk
+    min_trade = 10.0  # الحد الأدنى للتداول
+    
+    if risk_amount < min_trade:
+        return 0, 0
+    
+    quantity = risk_amount / current_price
+    return risk_amount, quantity
+
+# تنفيذ الصفقة مع نظام الربح التراكمي
+def execute_trade(symbol, signal):
+    current_price = simulate_market_movement(symbol)
+    amount, quantity = calculate_position_size(symbol, signal)
+    
+    if amount == 0:
         return None
     
+    trade_time = datetime.now()
+    trade_id = f"{symbol}_{trade_time.strftime('%Y%m%d_%H%M%S')}"
+    
     if signal == 'BUY':
-        # في الواقع، هنا سنشتري
-        quantity = risk_amount / current_price
         trade = {
-            'id': len(st.session_state.trades) + 1,
-            'timestamp': datetime.now(),
+            'trade_id': trade_id,
+            'timestamp': trade_time,
             'symbol': symbol,
-            'signal': signal,
+            'action': 'BUY',
             'entry_price': current_price,
-            'amount': risk_amount,
+            'amount': amount,
             'quantity': quantity,
             'status': 'OPEN',
             'type': 'LONG'
         }
-        st.session_state.balance -= risk_amount
+        st.session_state.balance -= amount
+        st.session_state.trades.append(trade)
         return trade
     
-    elif signal == 'SELL' and st.session_state.trades:
+    elif signal == 'SELL':
         # البحث عن صفقة مفتوحة للإغلاق
-        open_trades = [t for t in st.session_state.trades if t.get('status') == 'OPEN']
+        open_trades = [t for t in st.session_state.trades if t.get('status') == 'OPEN' and t.get('symbol') == symbol]
         if open_trades:
             entry_trade = open_trades[-1]
-            quantity = entry_trade['quantity']
-            profit = (current_price - entry_trade['entry_price']) * quantity
+            entry_price = entry_trade['entry_price']
+            entry_quantity = entry_trade['quantity']
+            
+            # حساب الربح/الخسارة
+            profit = (current_price - entry_price) * entry_quantity
             
             trade = {
-                'id': len(st.session_state.trades) + 1,
-                'timestamp': datetime.now(),
+                'trade_id': trade_id,
+                'timestamp': trade_time,
                 'symbol': symbol,
-                'signal': signal,
-                'entry_price': entry_trade['entry_price'],
+                'action': 'SELL',
+                'entry_price': entry_price,
                 'exit_price': current_price,
                 'amount': entry_trade['amount'],
+                'quantity': entry_quantity,
                 'profit': profit,
                 'status': 'CLOSED',
                 'type': 'CLOSE_LONG'
             }
             
-            # ✅ نظام الربح التراكمي - إضافة الربح للرصيد
+            # ✅ نظام الربح التراكمي - إضافة الربح للرصيد فوراً
             st.session_state.balance += entry_trade['amount'] + profit
             
-            # تحديث الصفقة المفتوحة
+            # تحديث الإحصائيات
+            st.session_state.performance_stats['total_trades'] += 1
+            st.session_state.performance_stats['total_profit'] += profit
+            if profit > 0:
+                st.session_state.performance_stats['winning_trades'] += 1
+            else:
+                st.session_state.performance_stats['losing_trades'] += 1
+            
+            # تحديث أعلى/أقل رصيد
+            st.session_state.performance_stats['max_balance'] = max(
+                st.session_state.performance_stats['max_balance'], 
+                st.session_state.balance
+            )
+            st.session_state.performance_stats['min_balance'] = min(
+                st.session_state.performance_stats['min_balance'], 
+                st.session_state.balance
+            )
+            
+            # تحديث حالة الصفقة المفتوحة
             entry_trade['status'] = 'CLOSED'
             entry_trade['exit_price'] = current_price
             entry_trade['profit'] = profit
             
+            st.session_state.trades.append(trade)
             return trade
     
     return None
 
-# محاكاة دورة البوت
+# دورة تشغيل البوت
 def run_bot_cycle(symbol):
-    current_price = generate_market_data(symbol)
-    signal = generate_trading_signal(symbol)
+    signal = generate_intelligent_signal(symbol)
     
     if signal in ['BUY', 'SELL']:
-        trade = execute_demo_trade(symbol, signal, current_price)
+        trade = execute_trade(symbol, signal)
         if trade:
-            st.session_state.trades.append(trade)
+            return {
+                'symbol': symbol,
+                'signal': signal,
+                'price': st.session_state.market_data[symbol]["price"],
+                'trade': trade,
+                'balance': st.session_state.balance,
+                'timestamp': datetime.now()
+            }
     
     return {
         'symbol': symbol,
-        'price': current_price,
-        'signal': signal,
-        'timestamp': datetime.now(),
-        'balance': st.session_state.balance
+        'signal': 'HOLD',
+        'price': st.session_state.market_data[symbol]["price"],
+        'balance': st.session_state.balance,
+        'timestamp': datetime.now()
     }
 
-# الواجهة
-st.sidebar.header("⚙️ إعدادات البوت")
+# واجهة المستخدم المحسنة
+st.sidebar.header("⚙️ إعدادات البوت المتقدمة")
 
 # إعدادات التداول
-symbol = st.sidebar.selectbox("اختر الزوج:", ["BTCUSDT", "ETHUSDT", "ADAUSDT"])
-initial_balance = st.sidebar.number_input("رأس المال الابتدائي ($):", 10.0, 10000.0, 1000.0)
+selected_symbol = st.sidebar.selectbox(
+    "اختر زوج التداول:",
+    ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT"],
+    index=0
+)
 
-if st.sidebar.button("🔄 تعيين رأس المال"):
-    st.session_state.balance = initial_balance
-    st.session_state.initial_balance = initial_balance
+# إدارة الرصيد
+st.sidebar.subheader("إدارة الرصيد")
+new_balance = st.sidebar.number_input(
+    "تعيين رأس المال الجديد ($):",
+    min_value=10.0,
+    max_value=100000.0,
+    value=float(st.session_state.balance),
+    step=100.0
+)
+
+if st.sidebar.button("💾 حفظ الرصيد الجديد"):
+    st.session_state.balance = new_balance
+    st.session_state.initial_balance = new_balance
+    st.session_state.performance_stats['max_balance'] = new_balance
+    st.session_state.performance_stats['min_balance'] = new_balance
+    st.sidebar.success("تم تحديث الرصيد بنجاح!")
+
+if st.sidebar.button("🔄 إعادة التعيين"):
+    st.session_state.balance = 1000.0
+    st.session_state.initial_balance = 1000.0
     st.session_state.trades = []
-    st.success("تم تعيين رأس المال بنجاح!")
+    st.session_state.performance_stats = {
+        'total_trades': 0,
+        'winning_trades': 0,
+        'losing_trades': 0,
+        'total_profit': 0.0,
+        'max_balance': 1000.0,
+        'min_balance': 1000.0
+    }
+    st.sidebar.success("تم إعادة التعيين بنجاح!")
 
-# الأقسام الرئيسية
-tab1, tab2, tab3 = st.tabs(["🏠 لوحة التحكم", "🤖 تشغيل البوت", "📊 الإحصائيات"])
+# التنقل بين الصفحات
+tabs = st.tabs(["🏠 اللوحة الرئيسية", "📊 أداء البوت", "💼 إدارة المحفظة", "⚙️ الإعدادات"])
 
-with tab1:
-    st.header("🏠 لوحة التحكم الرئيسية")
+with tabs[0]:
+    st.header("📊 اللوحة الرئيسية - المراقبة الحية")
     
+    # بطاقات الأداء
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("الرصيد الحالي", f"${st.session_state.balance:.2f}")
-        profit = st.session_state.balance - st.session_state.initial_balance
-        st.metric("الربح الإجمالي", f"${profit:.2f}")
+        profit_loss = st.session_state.balance - st.session_state.initial_balance
+        profit_color = "green" if profit_loss >= 0 else "red"
+        st.metric(
+            "الرصيد الحالي", 
+            f"${st.session_state.balance:,.2f}",
+            f"{profit_loss:+.2f}" if profit_loss != 0 else "0.00"
+        )
     
     with col2:
-        total_trades = len(st.session_state.trades)
-        winning_trades = len([t for t in st.session_state.trades if t.get('profit', 0) > 0])
-        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-        st.metric("معدل الفوز", f"{win_rate:.1f}%")
-        st.metric("إجمالي الصفقات", total_trades)
+        total_trades = st.session_state.performance_stats['total_trades']
+        win_rate = (st.session_state.performance_stats['winning_trades'] / total_trades * 100) if total_trades > 0 else 0
+        st.metric("معدل الفوز", f"{win_rate:.1f}%", f"{total_trades} صفقات")
     
     with col3:
-        current_price = st.session_state.demo_prices[symbol]
-        st.metric(f"سعر {symbol}", f"${current_price:.2f}")
-        st.metric("حالة البوت", "🟢 يعمل" if st.session_state.bot_running else "🔴 متوقف")
+        current_price = st.session_state.market_data[selected_symbol]["price"]
+        st.metric(f"سعر {selected_symbol}", f"${current_price:,.2f}")
     
     with col4:
-        if st.session_state.trades:
-            last_trade = st.session_state.trades[-1]
-            st.metric("آخر إشارة", last_trade.get('signal', 'N/A'))
-            st.metric("الأرباح المغلقة", f"${sum(t.get('profit', 0) for t in st.session_state.trades):.2f}")
-
-    # الرسم البياني
-    st.subheader("📈 منحنى رأس المال التراكمي")
+        bot_status = "🟢 نشط" if st.session_state.bot_running else "🔴 متوقف"
+        st.metric("حالة البوت", bot_status)
+    
+    # الرسم البياني التفاعلي
+    st.subheader("📈 منحنى نمو رأس المال التراكمي")
     
     if st.session_state.trades:
-        # إنشاء منحنى الأسهم
-        equity_data = []
-        balance = st.session_state.initial_balance
-        dates = []
-        
-        for trade in st.session_state.trades:
-            if trade.get('status') == 'CLOSED' and 'profit' in trade:
-                balance += trade['profit']
-                equity_data.append(balance)
-                dates.append(trade['timestamp'])
-        
-        if equity_data:
+        closed_trades = [t for t in st.session_state.trades if t.get('status') == 'CLOSED']
+        if closed_trades:
+            # بناء منحنى الأسهم
+            equity_data = []
+            balance = st.session_state.initial_balance
+            dates = []
+            
+            for trade in closed_trades:
+                if 'profit' in trade:
+                    balance += trade['profit']
+                    equity_data.append(balance)
+                    dates.append(trade['timestamp'])
+            
             fig = go.Figure()
+            
+            # منحنى رأس المال
             fig.add_trace(go.Scatter(
                 x=dates,
                 y=equity_data,
                 mode='lines+markers',
-                name='رأس المال',
-                line=dict(color='#00ff88', width=4),
-                marker=dict(size=6)
+                name='رأس المال التراكمي',
+                line=dict(color='#00D4AA', width=4),
+                marker=dict(size=6, color='#007AFF')
             ))
             
             # خط رأس المال الأولي
-            fig.add_hline(y=st.session_state.initial_balance, line_dash="dash", 
-                         line_color="red", annotation_text="رأس المال الابتدائي")
+            fig.add_hline(
+                y=st.session_state.initial_balance,
+                line_dash="dash",
+                line_color="red",
+                annotation_text="رأس المال الابتدائي"
+            )
             
             fig.update_layout(
                 title="تطور رأس المال مع نظام المرابحة التراكمية",
                 xaxis_title="الوقت",
                 yaxis_title="رأس المال ($)",
                 height=500,
-                template="plotly_dark"
+                template="plotly_white",
+                showlegend=True
             )
             
             st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("⏳ لا توجد صفقات مغلقة حتى الآن. قم بتشغيل البوت لبدء التداول.")
+    else:
+        st.info("🎯 البوت جاهز للبدء! استخدم الأزرار أدناه لبدء التداول.")
 
-with tab2:
-    st.header("🤖 التحكم في البوت")
+with tabs[1]:
+    st.header("📈 تحليل أداء البوت")
     
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("تشغيل البوت")
+    if st.session_state.performance_stats['total_trades'] > 0:
+        col1, col2 = st.columns([2, 1])
         
-        col1_1, col1_2, col1_3 = st.columns(3)
+        with col1:
+            st.subheader("إحصائيات الأداء التفصيلية")
+            
+            stats = st.session_state.performance_stats
+            total_profit = stats['total_profit']
+            win_rate = (stats['winning_trades'] / stats['total_trades'] * 100) if stats['total_trades'] > 0 else 0
+            max_drawdown = ((stats['max_balance'] - stats['min_balance']) / stats['max_balance'] * 100) if stats['max_balance'] > 0 else 0
+            
+            metric_col1, metric_col2, metric_col3 = st.columns(3)
+            
+            with metric_col1:
+                st.metric("إجمالي الأرباح", f"${total_profit:,.2f}")
+                st.metric("أعلى رصيد", f"${stats['max_balance']:,.2f}")
+            
+            with metric_col2:
+                st.metric("معدل الفوز", f"{win_rate:.1f}%")
+                st.metric("أدنى رصيد", f"${stats['min_balance']:,.2f}")
+            
+            with metric_col3:
+                st.metric("أقصى انخفاض", f"{max_drawdown:.1f}%")
+                st.metric("متوسط ربح/صفقة", f"${(total_profit/stats['total_trades']):.2f}" if stats['total_trades'] > 0 else "$0.00")
         
-        with col1_1:
-            if st.button("▶️ بدء التشغيل التلقائي", type="primary", use_container_width=True):
-                st.session_state.bot_running = True
-                st.success("🚀 البوت يعمل الآن! يجري الصفقات تلقائياً")
-        
-        with col1_2:
-            if st.button("⏸️ إيقاف مؤقت", use_container_width=True):
-                st.session_state.bot_running = False
-                st.warning("⏸️ البوت متوقف مؤقتاً")
-        
-        with col1_3:
-            if st.button("⏹️ إيقاف كلي", use_container_width=True):
-                st.session_state.bot_running = False
-                st.session_state.trades = []
-                st.session_state.balance = st.session_state.initial_balance
-                st.error("⏹️ تم إيقاف البوت ومسح السجل")
-        
-        # تشغيل دورة واحدة
-        if st.button("🔄 تشغيل دورة تجريبية", use_container_width=True):
-            result = run_bot_cycle(symbol)
-            if result['signal'] != 'HOLD':
-                st.success(f"✅ تم تنفيذ صفقة: {result['signal']} على {result['symbol']}")
-                st.info(f"💵 السعر: ${result['price']:.2f} | 💰 الرصيد: ${result['balance']:.2f}")
-            else:
-                st.info("ℹ️ لا توجد إشارة تداول مناسبة حالياً")
-    
-    with col2:
-        st.subheader("الإشارات الحية")
-        
-        # مؤشرات فنية وهمية
-        indicators = {
-            'المؤشر': ['RSI', 'المتجه', 'الزخم', 'التقلب', 'التصنيف'],
-            'القيمة': [f"{random.randint(30, 70)}", 
-                      f"{random.randint(-20, 20)}", 
-                      f"{random.randint(-15, 15)}",
-                      f"{random.randint(10, 30)}%",
-                      random.choice(['قوي', 'متوسط', 'ضعيف'])],
-            'الإشارة': [random.choice(['🟢', '🔴', '🟡']) for _ in range(5)]
-        }
-        
-        st.dataframe(pd.DataFrame(indicators), use_container_width=True)
-        
-        # مؤشر الثقة
-        confidence = random.randint(60, 95)
-        st.progress(confidence/100, text=f"ثقة الخوارزمية: {confidence}%")
+        with col2:
+            st.subheader("توزيع الصفقات")
+            labels = ['رابحة', 'خاسرة']
+            values = [stats['winning_trades'], stats['losing_trades']]
+            
+            if any(values):
+                fig_pie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3)])
+                fig_pie.update_layout(height=300)
+                st.plotly_chart(fig_pie, use_container_width=True)
+    else:
+        st.info("📊 لا توجد بيانات أداء حتى الآن. ابدأ التداول لتظهر الإحصائيات هنا.")
 
-with tab3:
-    st.header("📊 تحليل الأداء التفصيلي")
+with tabs[2]:
+    st.header("💼 إدارة المحفظة والصفقات")
     
+    # سجل الصفقات
     if st.session_state.trades:
-        # تحليل الصفقات
+        st.subheader("سجل الصفقات المفصل")
+        
+        # تصفية الصفقات المغلقة للعرض
         closed_trades = [t for t in st.session_state.trades if t.get('status') == 'CLOSED']
         
         if closed_trades:
-            col1, col2 = st.columns([2, 1])
+            # تحضير البيانات للعرض
+            display_data = []
+            for trade in closed_trades[-20:]:  # آخر 20 صفقة
+                display_data.append({
+                    'الوقت': trade['timestamp'].strftime('%Y-%m-%d %H:%M'),
+                    'الزوج': trade['symbol'],
+                    'الإجراء': trade['action'],
+                    'سعر الدخول': f"${trade['entry_price']:,.2f}",
+                    'سعر الخروج': f"${trade.get('exit_price', 0):,.2f}",
+                    'الربح': f"${trade.get('profit', 0):,.2f}",
+                    'الحالة': '🟢' if trade.get('profit', 0) > 0 else '🔴'
+                })
             
-            with col1:
-                st.subheader("سجل الصفقات المفصل")
-                trades_df = pd.DataFrame(closed_trades[-10:])  # آخر 10 صفقات
-                
-                if not trades_df.empty:
-                    # تنسيق الأعمدة
-                    display_df = trades_df[['timestamp', 'symbol', 'signal', 'entry_price', 'exit_price', 'profit', 'amount']].copy()
-                    display_df['profit'] = display_df['profit'].apply(lambda x: f"${x:.2f}")
-                    display_df['amount'] = display_df['amount'].apply(lambda x: f"${x:.2f}")
-                    display_df['entry_price'] = display_df['entry_price'].apply(lambda x: f"${x:.2f}")
-                    display_df['exit_price'] = display_df['exit_price'].apply(lambda x: f"${x:.2f}")
-                    
-                    st.dataframe(display_df, use_container_width=True)
-            
-            with col2:
-                st.subheader("إحصائيات الأداء")
-                
-                total_profit = sum(t.get('profit', 0) for t in closed_trades)
-                avg_profit = total_profit / len(closed_trades) if closed_trades else 0
-                winning_trades = [t for t in closed_trades if t.get('profit', 0) > 0]
-                win_rate = len(winning_trades) / len(closed_trades) * 100 if closed_trades else 0
-                
-                st.metric("متوسط الربح/صفقة", f"${avg_profit:.2f}")
-                st.metric("معدل الفوز", f"{win_rate:.1f}%")
-                st.metric("أعلى ربح", f"${max([t.get('profit', 0) for t in closed_trades]):.2f}" if closed_trades else "$0.00")
-                st.metric("أدنى ربح", f"${min([t.get('profit', 0) for t in closed_trades]):.2f}" if closed_trades else "$0.00")
-        
+            df = pd.DataFrame(display_data)
+            st.dataframe(df, use_container_width=True)
         else:
-            st.info("⏳ لا توجد صفقات مغلقة حتى الآن")
+            st.info("💼 لا توجد صفقات مغلقة حتى الآن.")
     else:
-        st.warning("🔍 لم يتم تنفيذ أي صفقات بعد. قم بتشغيل البوت أولاً.")
+        st.info("💼 سجل الصفقات فارغ. ابدأ التداول لملء السجل.")
 
-# التشغيل التلقائي
+with tabs[3]:
+    st.header("⚙️ إعدادات البوت المتقدمة")
+    
+    st.subheader("التحكم في التشغيل")
+    control_col1, control_col2, control_col3 = st.columns(3)
+    
+    with control_col1:
+        if st.button("▶️ بدء التشغيل التلقائي", type="primary", use_container_width=True):
+            st.session_state.bot_running = True
+            st.success("🚀 البوت يعمل الآن! يجري الصفقات تلقائياً كل 10 ثوانٍ")
+    
+    with control_col2:
+        if st.button("🔄 دورة واحدة", use_container_width=True):
+            result = run_bot_cycle(selected_symbol)
+            if result['signal'] != 'HOLD':
+                st.success(f"✅ تم تنفيذ صفقة {result['signal']} على {result['symbol']}")
+                st.info(f"💰 السعر: ${result['price']:,.2f} | الرصيد: ${result['balance']:,.2f}")
+            else:
+                st.info("ℹ️ لا توجد إشارة تداول مناسبة حالياً")
+    
+    with control_col3:
+        if st.button("⏸️ إيقاف البوت", use_container_width=True):
+            st.session_state.bot_running = False
+            st.warning("⏸️ البوت متوقف حالياً")
+    
+    st.subheader("معلومات السوق الحية")
+    for symbol, data in st.session_state.market_data.items():
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.write(f"**{symbol}**")
+        with col2:
+            st.write(f"${data['price']:,.2f}")
+
+# التشغيل التلقائي في الخلفية
 if st.session_state.bot_running:
-    st.write("---")
-    st.write("🔄 **جاري التشغيل التلقائي...** (يتحقق كل 5 ثوانٍ)")
-    
-    # محاكاة التشغيل التلقائي
-    if 'last_auto_run' not in st.session_state:
-        st.session_state.last_auto_run = time.time()
-    
-    current_time = time.time()
-    if current_time - st.session_state.last_auto_run > 5:  # كل 5 ثواني
-        result = run_bot_cycle(symbol)
-        st.session_state.last_auto_run = current_time
+    current_time = datetime.now()
+    if (current_time - st.session_state.last_update).seconds >= 10:  # كل 10 ثوانٍ
+        result = run_bot_cycle(selected_symbol)
+        st.session_state.last_update = current_time
         
-        # عرض آخر نشاط
+        # عرض تحديث سريع
         if result['signal'] != 'HOLD':
-            st.success(f"🔄 تم تنفيذ صفقة تلقائية: {result['signal']} | الرصيد: ${result['balance']:.2f}")
+            st.rerun()
 
-# التذييل
+# التذييل المحسن
 st.markdown("---")
 st.markdown(
     """
-    <div style='text-align: center'>
-        <p><b>بوت التداول الذكي - النسخة التجريبية</b></p>
-        <p>🚀 يعمل بنظام المرابحة التراكمية | ⚠️ هذه نسخة تجريبية</p>
-        <p>💡 ملاحظة: هذا تطبيق محاكاة ولا يتصل بمنصات تداول حقيقية</p>
+    <div style='text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;'>
+    <h3 style='color: white; margin: 0;'>البوت اللورنتزي الذكي - الإصدار النهائي</h3>
+    <p style='margin: 10px 0 0 0;'>نظام تداول بربح تراكمي • إدارة مخاطر ذكية • واجهة احترافية</p>
+    <p style='margin: 5px 0 0 0;'>⚠️ تذكر: هذا تطبيق محاكاة لأغراض تعليمية</p>
     </div>
     """,
     unsafe_allow_html=True
