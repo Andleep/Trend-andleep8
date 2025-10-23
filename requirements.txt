@@ -1,0 +1,7 @@
+python-binance==1.0.15
+pandas
+numpy
+python-dotenv
+requests
+psutil
+tinydb

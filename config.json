@@ -1,0 +1,27 @@
+{
+  "pairs": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT"
+  ],
+  "timeframe": "5m",
+  "risk_config": {
+    "BTCUSDT": 0.05,
+    "ETHUSDT": 0.05,
+    "SOLUSDT": 0.03
+  },
+  "safety_limits": {
+    "max_daily_loss": 0.05,
+    "max_position_size": 0.1,
+    "max_total_exposure": 0.3,
+    "cooldown_after_loss": 300
+  },
+  "liquidity": {
+    "percent_of_24h_volume_cap": 0.01,
+    "book_levels_to_check": 5
+  },
+  "monitoring": {
+    "health_check_interval": 30,
+    "save_interval_trades": 5
+  }
+}
