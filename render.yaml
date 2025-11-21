@@ -1,12 +1,14 @@
 services:
   - type: web
-    name: aion-quantum-ultra-max
+    name: aion-quantum-max
     env: python
     plan: free
     buildCommand: |
       pip install --upgrade pip
+      pip install wheel
       pip install setuptools==68.2.2
-      pip install -r requirements.txt
+      pip install numpy==1.21.6 --no-cache-dir
+      pip install -r requirements.txt --no-cache-dir
     startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
     envVars:
       - key: PYTHON_VERSION
